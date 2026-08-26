@@ -752,17 +752,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
 
 [[package]]
-name = "ts_render"
+name = "ts-render"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "ts-render-core",
+]
+
+[[package]]
+name = "ts-render-core"
 version = "0.1.0"
 dependencies = [
  "cairo-rs",
- "clap",
  "libloading",
  "object",
  "pango",
  "pangocairo",
  "serde",
- "serde_json",
  "serde_yaml",
  "tree-sitter",
 ]

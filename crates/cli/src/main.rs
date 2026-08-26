@@ -1,22 +1,16 @@
 // main.rs
-mod highlights;
-mod parser;
-mod render;
-mod theme;
 
 use std::{
     env,
     error::Error,
     fs,
-    mem::ManuallyDrop,
     path::{Path, PathBuf},
 };
 
 use clap::{Parser as ClapParser, Subcommand};
-use libloading::{Library, Symbol};
-use object::{Object, ObjectSymbol};
 use serde_json::Value;
-use tree_sitter::{Language, Query};
+
+use ts_render_core::{generate_svg, highlights, parser, theme};
 
 #[derive(ClapParser)]
 #[command(version, about)]
@@ -79,59 +73,6 @@ fn load_config(path: Option<PathBuf>) -> Result<Value, Box<dyn Error>> {
     let path = config_path(path)?;
     let contents = fs::read_to_string(&path)?;
     Ok(serde_json::from_str(&contents)?)
-}
-
-struct LoadedLanguage {
-    _library: Library,
-    language: ManuallyDrop<Language>,
-}
-
-fn get_symbol(path: &Path) -> Result<Option<String>, Box<dyn Error>> {
-    let data = fs::read(path)?;
-    let file = object::File::parse(&*data)?;
-
-    let symbol = file
-        .symbols()
-        .filter_map(|symbol| {
-            let name = symbol.name().ok()?;
-            name.strip_prefix("tree_sitter_")
-                .map(|suffix| (name, suffix.len()))
-        })
-        .min_by_key(|(_, len)| *len)
-        .map(|(name, _)| name.to_owned());
-
-    Ok(symbol)
-}
-
-fn load_parser_library(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
-    let filename = path
-        .file_name()
-        .and_then(|x| x.to_str())
-        .ok_or("invalid language library path")?;
-    let stem = filename
-        .strip_suffix(".so")
-        .ok_or_else(|| format!("invalid language library: {filename}"))?;
-    if stem.is_empty() {
-        return Err("invalid language library name".into());
-    }
-    let symbol = match get_symbol(path)? {
-        Some(v) => v,
-        None => {
-            return Err(format!("failed to read symbol from {path:?}").into());
-        }
-    };
-    let library = unsafe { Library::new(path) }?;
-    let language_fn: Symbol<unsafe extern "C" fn() -> *const tree_sitter::ffi::TSLanguage> =
-        unsafe { library.get(symbol.as_bytes())? };
-    let raw = unsafe { language_fn() };
-    if raw.is_null() {
-        return Err(format!("{symbol} returned a null language").into());
-    }
-    let language = unsafe { ManuallyDrop::new(Language::from_raw(raw)) };
-    Ok(LoadedLanguage {
-        _library: library,
-        language,
-    })
 }
 
 fn parser_directories(config: &Value) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -251,31 +192,21 @@ fn run(
 
     let theme_path = theme_dir.join(format!("{theme}.yaml"));
 
-    let colours = theme::load_base16(&theme_path)?;
+    let palette = theme::load_base16(&theme_path)?;
     let source = fs::read(input)?;
-    let query_source = String::from_utf8(fs::read(&scheme_path)?)?;
-    let loaded = load_parser_library(&lang_path)?;
-
-    let query = Query::new(&loaded.language, &query_source)?;
-    let captures = parser::collect_captures(&source, &loaded.language, &query)?;
-
-    let tokens = render::make_tokens(
-        &source,
-        &captures,
-        &query,
-        &colours,
-        highlights::DEFAULT_MAPPINGS,
-    );
-
+    let loaded = parser::load_dynamic(&lang_path)?;
+    let query = parser::load_query(&scheme_path, &loaded.language)?;
     let output_path = Path::new(&output);
 
-    render::render(
+    generate_svg(
+        output_path,
         &source,
-        &tokens,
-        &output_path,
-        &colours,
-        &font_family,
-        font_size,
+        &loaded.language,
+        &query,
+        &palette,
+        Some(highlights::DEFAULT_MAPPINGS),
+        Some(font_family),
+        Some(font_size),
     )
 }
 

@@ -7,7 +7,6 @@ use pango::{AttrColor, AttrList, FontDescription, Style, Underline, Weight};
 use crate::highlights::{Highlight, Mapping, get_colour};
 use crate::parser::Capture;
 use crate::theme::Rgb;
-use tree_sitter::Query;
 
 use std::{error::Error, path::Path};
 
@@ -116,7 +115,6 @@ pub fn render(
 pub fn make_tokens(
     source: &[u8],
     captures: &[Capture],
-    query: &Query,
     colours: &[Rgb; 16],
     mapping: &[Mapping],
 ) -> Vec<Token> {
@@ -136,7 +134,7 @@ pub fn make_tokens(
                 .rev()
                 .find(|capture| capture.start <= end && end < capture.end);
 
-            if next.map(|capture| capture.index) != active.map(|capture| capture.index) {
+            if next.map(|capture| capture.group) != active.map(|capture| capture.group) {
                 break;
             }
 
@@ -145,8 +143,7 @@ pub fn make_tokens(
 
         let (hl, colour) = match active {
             Some(capture) => {
-                let name = query.capture_names()[capture.index as usize];
-                let hl = get_colour(name, mapping);
+                let hl = get_colour(capture.group, mapping);
                 (hl, colours[hl.colour])
             }
             None => (Highlight::default(), colours[5]),

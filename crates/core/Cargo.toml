@@ -1,0 +1,19 @@
+[package]
+name = "ts-render-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cairo-rs = { version = "0.22", features = ["svg"] }
+libloading = "0.9"
+pango = "0.22"
+pangocairo = "0.22"
+tree-sitter = "0.26.13"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+object = "0.40.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
