@@ -1,26 +1,4 @@
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Highlight {
-    pub colour: usize,
-    pub bold: bool,
-    pub italic: bool,
-    pub underline: bool,
-    pub strikethrough: bool,
-    pub undercurl: bool,
-}
-
-pub struct Mapping {
-    name: &'static str,
-    hl: Highlight,
-}
-
-pub fn get_colour(name: &str, mapping: &[Mapping]) -> Highlight {
-    mapping
-        .binary_search_by(|m| m.name.cmp(name))
-        .map(|i| mapping[i].hl)
-        .unwrap_or_else(|_| hl(0x05))
-}
-
-pub const DEFAULT_MAPPINGS: &[Mapping] = &[
+const MAPPINGS: &[Mapping] = &[
     Mapping {
         name: "attribute",
         hl: hl(0x0f),
@@ -419,13 +397,9 @@ pub const DEFAULT_MAPPINGS: &[Mapping] = &[
     },
 ];
 
-const fn hl(colour: usize) -> Highlight {
-    Highlight {
-        colour,
-        bold: false,
-        italic: false,
-        underline: false,
-        strikethrough: false,
-        undercurl: false,
-    }
+pub fn get_colour(name: &str) -> Highlight {
+    MAPPINGS
+        .binary_search_by(|m| m.name.cmp(name))
+        .map(|i| MAPPINGS[i].hl)
+        .unwrap_or_else(|_| hl(0x05))
 }

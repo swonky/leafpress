@@ -1,4 +1,8 @@
+// main.rs
 mod highlights;
+mod parser;
+mod render;
+mod theme;
 
 use std::{
     env,
@@ -8,30 +12,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cairo::{Context as CairoContext, SvgSurface};
 use clap::{Parser as ClapParser, Subcommand};
 use libloading::{Library, Symbol};
-use pango::prelude::FontMapExt;
-use pango::{AttrColor, AttrList, FontDescription, Style, Underline, Weight};
+use object::{Object, ObjectSymbol};
 use serde_json::Value;
-use tree_sitter::{Language, Parser as TSParser, Query, QueryCursor, StreamingIterator};
-
-use highlights::{Highlight, get_colour};
-
-#[derive(Clone, Copy, Debug)]
-struct Rgb {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
-#[derive(Debug)]
-struct Token {
-    start: usize,
-    end: usize,
-    hl: Highlight,
-    colour: Rgb,
-}
+use tree_sitter::{Language, Query};
 
 #[derive(ClapParser)]
 #[command(version, about)]
@@ -80,58 +65,6 @@ enum Command {
     },
 }
 
-use serde::Deserialize;
-
-#[derive(Deserialize)]
-struct Base16Theme {
-    base00: String,
-    base01: String,
-    base02: String,
-    base03: String,
-    base04: String,
-    base05: String,
-    base06: String,
-    base07: String,
-    base08: String,
-    base09: String,
-    #[serde(rename = "base0A")]
-    base0a: String,
-    #[serde(rename = "base0B")]
-    base0b: String,
-    #[serde(rename = "base0C")]
-    base0c: String,
-    #[serde(rename = "base0D")]
-    base0d: String,
-    #[serde(rename = "base0E")]
-    base0e: String,
-    #[serde(rename = "base0F")]
-    base0f: String,
-}
-
-fn load_base16(path: PathBuf) -> Result<[Rgb; 16], Box<dyn Error>> {
-    let file = fs::File::open(path)?;
-    let theme: Base16Theme = serde_yaml::from_reader(file)?;
-
-    Ok([
-        parse_hex(&theme.base00)?,
-        parse_hex(&theme.base01)?,
-        parse_hex(&theme.base02)?,
-        parse_hex(&theme.base03)?,
-        parse_hex(&theme.base04)?,
-        parse_hex(&theme.base05)?,
-        parse_hex(&theme.base06)?,
-        parse_hex(&theme.base07)?,
-        parse_hex(&theme.base08)?,
-        parse_hex(&theme.base09)?,
-        parse_hex(&theme.base0a)?,
-        parse_hex(&theme.base0b)?,
-        parse_hex(&theme.base0c)?,
-        parse_hex(&theme.base0d)?,
-        parse_hex(&theme.base0e)?,
-        parse_hex(&theme.base0f)?,
-    ])
-}
-
 fn config_path(path: Option<PathBuf>) -> Result<PathBuf, Box<dyn Error>> {
     path.or_else(|| {
         env::var_os("XDG_CONFIG_HOME").map(|p| PathBuf::from(p).join("tree-sitter/config.json"))
@@ -148,21 +81,26 @@ fn load_config(path: Option<PathBuf>) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_str(&contents)?)
 }
 
-fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
-    let s = s.trim().trim_start_matches('#');
-    if s.len() != 6 {
-        return Err(format!("invalid colour: {s}").into());
-    }
-    Ok(Rgb {
-        r: u8::from_str_radix(&s[0..2], 16)?,
-        g: u8::from_str_radix(&s[2..4], 16)?,
-        b: u8::from_str_radix(&s[4..6], 16)?,
-    })
-}
-
 struct LoadedLanguage {
     _library: Library,
     language: ManuallyDrop<Language>,
+}
+
+fn get_symbol(path: &Path) -> Result<Option<String>, Box<dyn Error>> {
+    let data = fs::read(path)?;
+    let file = object::File::parse(&*data)?;
+
+    let symbol = file
+        .symbols()
+        .filter_map(|symbol| {
+            let name = symbol.name().ok()?;
+            name.strip_prefix("tree_sitter_")
+                .map(|suffix| (name, suffix.len()))
+        })
+        .min_by_key(|(_, len)| *len)
+        .map(|(name, _)| name.to_owned());
+
+    Ok(symbol)
 }
 
 fn load_parser_library(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
@@ -176,8 +114,12 @@ fn load_parser_library(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
     if stem.is_empty() {
         return Err("invalid language library name".into());
     }
-    let symbol = format!("tree_sitter_{stem}");
-
+    let symbol = match get_symbol(path)? {
+        Some(v) => v,
+        None => {
+            return Err(format!("failed to read symbol from {path:?}").into());
+        }
+    };
     let library = unsafe { Library::new(path) }?;
     let language_fn: Symbol<unsafe extern "C" fn() -> *const tree_sitter::ffi::TSLanguage> =
         unsafe { library.get(symbol.as_bytes())? };
@@ -190,169 +132,6 @@ fn load_parser_library(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
         _library: library,
         language,
     })
-}
-
-fn collect_captures(
-    source: &[u8],
-    language: &Language,
-    query_source: &str,
-) -> Result<Vec<(usize, usize, u32)>, Box<dyn Error>> {
-    let mut parser = TSParser::new();
-    parser.set_language(language)?;
-    let tree = parser.parse(source, None).ok_or("failed to parse source")?;
-    let query = Query::new(language, query_source)?;
-    let mut cursor = QueryCursor::new();
-    let mut captures = Vec::new();
-    let mut iter = cursor.captures(&query, tree.root_node(), source);
-
-    while let Some((m, index)) = iter.next() {
-        let capture = m.captures[*index];
-        let start = capture.node.start_byte();
-        let end = capture.node.end_byte();
-        if start != end {
-            captures.push((start, end, capture.index));
-        }
-    }
-    Ok(captures)
-}
-
-fn make_tokens(
-    source: &[u8],
-    captures: &[(usize, usize, u32)],
-    query: &Query,
-    colours: &[Rgb; 16],
-) -> Vec<Token> {
-    let mut tokens = Vec::new();
-    let mut position = 0usize;
-
-    while position < source.len() {
-        let active = captures
-            .iter()
-            .rev()
-            .find(|(start, end, _)| *start <= position && position < *end);
-        let mut end = position + 1;
-        while end < source.len() {
-            let next = captures
-                .iter()
-                .rev()
-                .find(|(start, finish, _)| *start <= end && end < *finish);
-            if next.map(|x| x.2) != active.map(|x| x.2) {
-                break;
-            }
-            end += 1;
-        }
-
-        let (hl, colour) = match active {
-            Some((_, _, capture_index)) => {
-                let name = query.capture_names()[*capture_index as usize];
-                let hl = get_colour(name);
-                (hl, colours[hl.colour])
-            }
-            None => (Highlight::default(), colours[5]),
-        };
-        tokens.push(Token {
-            start: position,
-            end,
-            hl,
-            colour,
-        });
-        position = end;
-    }
-    tokens
-}
-
-fn render(
-    source: &[u8],
-    tokens: &[Token],
-    output: &Path,
-    colours: &[Rgb; 16],
-    font_family: &str,
-    font_size: u8,
-) -> Result<(), Box<dyn Error>> {
-    let text = std::str::from_utf8(source)?;
-
-    let font_map = pangocairo::FontMap::default();
-    let context = font_map.create_context();
-    let layout = pango::Layout::new(&context);
-    layout.set_text(&text);
-
-    let attrs = AttrList::new();
-    let mut output_position = 0usize;
-    for token in tokens {
-        let length = token.end - token.start;
-        let start = output_position as i32;
-        let end = (output_position + length) as i32;
-
-        let rgb = token.colour;
-        let mut attr: pango::Attribute =
-            AttrColor::new_foreground(rgb.r as u16 * 257, rgb.g as u16 * 257, rgb.b as u16 * 257)
-                .into();
-        attr.set_start_index(start as u32);
-        attr.set_end_index(end as u32);
-        attrs.insert(attr);
-
-        if token.hl.bold {
-            let mut attr: pango::Attribute = pango::AttrInt::new_weight(Weight::Bold).into();
-            attr.set_start_index(start as u32);
-            attr.set_end_index(end as u32);
-            attrs.insert(attr);
-        }
-        if token.hl.italic {
-            let mut attr: pango::Attribute = pango::AttrInt::new_style(Style::Italic).into();
-            attr.set_start_index(start as u32);
-            attr.set_end_index(end as u32);
-            attrs.insert(attr);
-        }
-        if token.hl.underline {
-            let mut attr: pango::Attribute =
-                pango::AttrInt::new_underline(Underline::Single).into();
-            attr.set_start_index(start as u32);
-            attr.set_end_index(end as u32);
-            attrs.insert(attr);
-        }
-        if token.hl.undercurl {
-            let mut attr: pango::Attribute = pango::AttrInt::new_underline(Underline::Error).into();
-            attr.set_start_index(start as u32);
-            attr.set_end_index(end as u32);
-            attrs.insert(attr);
-        }
-        if token.hl.strikethrough {
-            let mut attr: pango::Attribute = pango::AttrInt::new_strikethrough(true).into();
-            attr.set_start_index(start as u32);
-            attr.set_end_index(end as u32);
-            attrs.insert(attr);
-        }
-        output_position += length;
-    }
-    layout.set_attributes(Some(&attrs));
-
-    let font_string = format!("{font_family} {font_size}");
-    let font = FontDescription::from_string(&font_string);
-    layout.set_font_description(Some(&font));
-    let (ink, _) = layout.pixel_extents();
-    let width = ink.width();
-    let height = ink.height();
-    let padding = 20.0;
-    let surface = SvgSurface::new(
-        width as f64 + padding * 2.0,
-        height as f64 + padding * 2.0,
-        Some(output),
-    )?;
-    let cr = CairoContext::new(&surface)?;
-    let background = colours[0];
-    cr.set_source_rgb(
-        background.r as f64 / 255.0,
-        background.g as f64 / 255.0,
-        background.b as f64 / 255.0,
-    );
-    cr.paint()?;
-    cr.move_to(padding, padding);
-    pangocairo::functions::update_layout(&cr, &layout);
-    pangocairo::functions::show_layout(&cr, &layout);
-    cr.status()?;
-    surface.finish();
-    println!("written {}", output.display());
-    Ok(())
 }
 
 fn parser_directories(config: &Value) -> Result<Vec<PathBuf>, Box<dyn Error>> {
@@ -472,17 +251,25 @@ fn run(
 
     let theme_path = theme_dir.join(format!("{theme}.yaml"));
 
-    let colours = load_base16(theme_path)?;
+    let colours = theme::load_base16(&theme_path)?;
     let source = fs::read(input)?;
     let query_source = String::from_utf8(fs::read(&scheme_path)?)?;
     let loaded = load_parser_library(&lang_path)?;
-    let captures = collect_captures(&source, &loaded.language, &query_source)?;
+
     let query = Query::new(&loaded.language, &query_source)?;
-    let tokens = make_tokens(&source, &captures, &query, &colours);
+    let captures = parser::collect_captures(&source, &loaded.language, &query)?;
+
+    let tokens = render::make_tokens(
+        &source,
+        &captures,
+        &query,
+        &colours,
+        highlights::DEFAULT_MAPPINGS,
+    );
 
     let output_path = Path::new(&output);
 
-    render(
+    render::render(
         &source,
         &tokens,
         &output_path,
