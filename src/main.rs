@@ -18,8 +18,6 @@ use tree_sitter::{Language, Parser as TSParser, Query, QueryCursor, StreamingIte
 
 use highlights::{Highlight, get_colour};
 
-// const VERSION: &str = "0.1.0";
-
 #[derive(Clone, Copy, Debug)]
 struct Rgb {
     r: u8,
@@ -53,7 +51,7 @@ enum Command {
         lang: String,
 
         /// Theme name
-        #[arg(short, long, default_value = "tokyonight/tokyonight")]
+        #[arg(short, long, default_value = "onedark/onedark")]
         theme: String,
 
         // Font family
@@ -65,8 +63,20 @@ enum Command {
         size: u8,
 
         /// Output file
-        #[arg(short, long, default_value = "output.svg")]
+        #[arg(short, long, default_value = "./output.svg")]
         output: String,
+
+        /// Parser directory
+        #[arg(long, env = "TSRENDER_CONFIG_PATH")]
+        config_path: Option<PathBuf>,
+
+        /// Parser directory
+        #[arg(short = 'p', long, env = "TSRENDER_GRAMMAR_DIR")]
+        grammar_dir: Option<PathBuf>,
+
+        /// Parser directory
+        #[arg(long, env = "TSRENDER_THEME_DIR", default_value = "./themes")]
+        theme_dir: PathBuf,
     },
 }
 
@@ -98,7 +108,7 @@ struct Base16Theme {
     base0f: String,
 }
 
-fn load_base16(path: &Path) -> Result<[Rgb; 16], Box<dyn Error>> {
+fn load_base16(path: PathBuf) -> Result<[Rgb; 16], Box<dyn Error>> {
     let file = fs::File::open(path)?;
     let theme: Base16Theme = serde_yaml::from_reader(file)?;
 
@@ -122,49 +132,20 @@ fn load_base16(path: &Path) -> Result<[Rgb; 16], Box<dyn Error>> {
     ])
 }
 
-fn get_config() -> Result<PathBuf, Box<dyn Error>> {
-    if let Some(xdg) = env::var_os("XDG_CONFIG_HOME") {
-        let path = PathBuf::from(xdg).join("tree-sitter").join("config.json");
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-
-    if let Some(home) = env::var_os("HOME") {
-        let path = PathBuf::from(home)
-            .join(".config")
-            .join("tree-sitter")
-            .join("config.json");
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-
-    Err("could not find tree-sitter config.json".into())
+fn config_path(path: Option<PathBuf>) -> Result<PathBuf, Box<dyn Error>> {
+    path.or_else(|| {
+        env::var_os("XDG_CONFIG_HOME").map(|p| PathBuf::from(p).join("tree-sitter/config.json"))
+    })
+    .or_else(|| {
+        env::var_os("HOME").map(|p| PathBuf::from(p).join(".config/tree-sitter/config.json"))
+    })
+    .ok_or_else(|| "failed to infer config file location.".into())
 }
 
-fn parser_directories() -> Result<Option<Vec<String>>, Box<dyn Error>> {
-    let json: Value = serde_json::from_str(&fs::read_to_string(&get_config()?)?)?;
-
-    let Some(value) = json.get("parser-directories") else {
-        return Ok(None);
-    };
-
-    let directories = value
-        .as_array()
-        .ok_or("\"parser-directories\" must be an array")?;
-
-    let directories = directories
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .map(String::from)
-                .ok_or("\"parser-directories\" must contain only strings")
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    return Ok(Some(directories));
+fn load_config(path: Option<PathBuf>) -> Result<Value, Box<dyn Error>> {
+    let path = config_path(path)?;
+    let contents = fs::read_to_string(&path)?;
+    Ok(serde_json::from_str(&contents)?)
 }
 
 fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
@@ -184,7 +165,7 @@ struct LoadedLanguage {
     language: ManuallyDrop<Language>,
 }
 
-fn load_language(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
+fn load_parser_library(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
     let filename = path
         .file_name()
         .and_then(|x| x.to_str())
@@ -374,6 +355,55 @@ fn render(
     Ok(())
 }
 
+fn parser_directories(config: &Value) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let Some(value) = config.get("parser-directories") else {
+        return Err("failed to retrieve 'parser-directories' value from config".into());
+    };
+
+    let directories = value
+        .as_array()
+        .ok_or("\"parser-directories\" must be an array")?;
+
+    if directories.is_empty() {
+        return Err("\"parser-directories\" contains no directories".into());
+    }
+
+    directories
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(PathBuf::from)
+                .ok_or("\"parser-directories\" must contain only strings".into())
+        })
+        .collect()
+}
+
+fn find_grammar(
+    grammar_path: Option<PathBuf>,
+    parser_directories: &[PathBuf],
+    lang: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    if let Some(path) = grammar_path {
+        if !path.is_dir() {
+            return Err(format!("grammar directory does not exist: {path:?}").into());
+        }
+
+        return Ok(path);
+    }
+
+    let name = format!("tree-sitter-{lang}");
+
+    parser_directories
+        .iter()
+        .map(|directory| directory.join(&name))
+        .find(|path| path.is_dir())
+        .ok_or_else(|| {
+            format!("could not find grammar directory '{name}' in any configured parser directory")
+                .into()
+        })
+}
+
 fn run(
     input: &str,
     output: &str,
@@ -381,49 +411,15 @@ fn run(
     theme: &str,
     font_family: &str,
     font_size: u8,
+    config_path: Option<PathBuf>,
+    grammar_dir: Option<PathBuf>,
+    theme_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let directories = match parser_directories() {
-        Ok(Some(value)) => {
-            let directories = value
-                .into_iter()
-                .filter(|value| Path::new(value).exists())
-                .collect::<Vec<_>>();
+    let config = load_config(config_path)?;
+    let directories = parser_directories(&config)?;
+    let grammar = find_grammar(grammar_dir, &directories, lang)?;
 
-            if directories.is_empty() {
-                return Err(std::io::Error::other(format!(
-                    "None of the tree-sitter parser directories exist."
-                ))
-                .into());
-            }
-
-            directories
-        }
-        Ok(None) => {
-            return Err(
-                std::io::Error::other(format!("No tree-sitter parser directories found.")).into(),
-            );
-        }
-        Err(error) => {
-            return Err(std::io::Error::other(format!(
-                "Failed to read tree-sitter configuration: {error}"
-            ))
-            .into());
-        }
-    };
-
-    // grammar directory
-    let name = format!("tree-sitter-{lang}");
-    let grammar_path = directories
-        .iter()
-        .find_map(|directory| {
-            let path = PathBuf::from(directory).join(&name);
-            path.is_dir().then_some(path)
-        })
-        .ok_or_else(|| {
-            std::io::Error::other(format!("could not find grammar directory for {lang}"))
-        })?;
-
-    let scheme_path = grammar_path.join("queries").join(format!("highlights.scm"));
+    let scheme_path = grammar.join("queries").join(format!("highlights.scm"));
 
     if !scheme_path.is_file() {
         return Err(std::io::Error::other(format!(
@@ -466,21 +462,20 @@ fn run(
         .into());
     }
 
-    let theme_path = match env::var_os("BASE16_THEME_PATH") {
-        Some(path) => Path::new(&path).join(format!("{}.yaml", theme)),
-        None => {
-            return Err(std::io::Error::other("BASE16_THEME_PATH is not set.").into());
-        }
-    };
-
-    if !theme_path.exists() {
-        return Err(format!("Failed to locate theme: {}", theme_path.to_str().unwrap()).into());
+    if !theme_dir.is_dir() {
+        return Err(format!(
+            "Failed to locate theme directory: {}",
+            theme_dir.to_str().unwrap()
+        )
+        .into());
     }
 
-    let colours = load_base16(&theme_path)?;
+    let theme_path = theme_dir.join(format!("{theme}.yaml"));
+
+    let colours = load_base16(theme_path)?;
     let source = fs::read(input)?;
     let query_source = String::from_utf8(fs::read(&scheme_path)?)?;
-    let loaded = load_language(&lang_path)?;
+    let loaded = load_parser_library(&lang_path)?;
     let captures = collect_captures(&source, &loaded.language, &query_source)?;
     let query = Query::new(&loaded.language, &query_source)?;
     let tokens = make_tokens(&source, &captures, &query, &colours);
@@ -508,7 +503,20 @@ fn main() {
             font,
             size,
             lang,
-        } => match run(&input, &output, &lang, &theme, &font, size) {
+            config_path,
+            grammar_dir,
+            theme_dir,
+        } => match run(
+            &input,
+            &output,
+            &lang,
+            &theme,
+            &font,
+            size,
+            config_path,
+            grammar_dir,
+            theme_dir,
+        ) {
             Ok(()) => std::process::exit(0),
             Err(err) => {
                 eprintln!("ERROR: {err}");
