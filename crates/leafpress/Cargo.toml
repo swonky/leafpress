@@ -1,5 +1,5 @@
 [package]
-name = "ts-render-core"
+name = "leafpress"
 version = "0.1.0"
 edition = "2024"
 
@@ -17,3 +17,4 @@ object = "0.40.0"
 lto = true
 codegen-units = 1
 strip = true
+

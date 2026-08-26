@@ -10,7 +10,7 @@ use std::{
 use clap::{Parser as ClapParser, Subcommand};
 use serde_json::Value;
 
-use ts_render_core::{generate_svg, highlights, parser, theme};
+use leafpress::{generate_svg, highlights, parser, theme};
 
 #[derive(ClapParser)]
 #[command(version, about)]
