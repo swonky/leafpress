@@ -6,4 +6,3 @@ target
 **/mutants.out*/
 rustc-ice-*.txt
 
-*.svg
