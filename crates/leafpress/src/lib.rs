@@ -6,27 +6,28 @@ pub mod theme;
 
 use std::{error::Error, path::Path};
 
-use highlights::Mapping;
-use theme::Rgb;
+use highlights::HighlightMap;
+use theme::Palette;
 use tree_sitter::{Language, Query};
 
-pub use highlights::DEFAULT_MAPPINGS;
+pub use highlights::DEFAULT_MAPPING;
 
-pub fn generate_svg(
+pub fn generate_svg<P: Palette>(
     output: &Path,
     source: &[u8],
     language: &Language,
     query: &Query,
-    palette: &[Rgb; 16],
-    mapping: Option<&[Mapping]>,
+    palette: &P,
+    mapping: Option<&HighlightMap>,
     font_family: Option<&str>,
     font_size: Option<u8>,
 ) -> Result<(), Box<dyn Error>> {
-    let mapping = mapping.unwrap_or(DEFAULT_MAPPINGS);
+    let mapping = mapping.unwrap_or(&DEFAULT_MAPPING);
     let font_family = font_family.unwrap_or("monospace");
     let font_size = font_size.unwrap_or(14);
 
     let captures = parser::collect_captures(&source, language, &query)?;
+    let background = palette.colour(0);
     let tokens = render::make_tokens(source, &captures, palette, mapping);
 
     let output_path = Path::new(&output);
@@ -35,7 +36,7 @@ pub fn generate_svg(
         source,
         &tokens,
         &output_path,
-        palette,
+        background,
         font_family,
         font_size,
     )

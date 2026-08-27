@@ -4,25 +4,25 @@ use cairo::{Context as CairoContext, SvgSurface};
 use pango::prelude::FontMapExt;
 use pango::{AttrColor, AttrList, FontDescription, Style, Underline, Weight};
 
-use crate::highlights::{Highlight, Mapping, get_colour};
+use crate::highlights::{Highlight, HighlightMap};
 use crate::parser::Capture;
-use crate::theme::Rgb;
+use crate::theme::{Palette, Rgb};
 
 use std::{error::Error, path::Path};
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'a> {
     start: usize,
     end: usize,
     hl: Highlight,
-    colour: Rgb,
+    colour: &'a Rgb,
 }
 
 pub fn render(
     source: &[u8],
     tokens: &[Token],
     output: &Path,
-    colours: &[Rgb; 16],
+    background: &Rgb,
     font_family: &str,
     font_size: u8,
 ) -> Result<(), Box<dyn Error>> {
@@ -96,7 +96,6 @@ pub fn render(
         Some(output),
     )?;
     let cr = CairoContext::new(&surface)?;
-    let background = colours[0];
     cr.set_source_rgb(
         background.r as f64 / 255.0,
         background.g as f64 / 255.0,
@@ -112,12 +111,12 @@ pub fn render(
     Ok(())
 }
 
-pub fn make_tokens(
+pub fn make_tokens<'a, P: Palette>(
     source: &[u8],
     captures: &[Capture],
-    colours: &[Rgb; 16],
-    mapping: &[Mapping],
-) -> Vec<Token> {
+    palette: &'a P,
+    mapping: &HighlightMap,
+) -> Vec<Token<'a>> {
     let mut tokens = Vec::new();
     let mut position = 0usize;
 
@@ -143,10 +142,10 @@ pub fn make_tokens(
 
         let (hl, colour) = match active {
             Some(capture) => {
-                let hl = get_colour(capture.group, mapping);
-                (hl, colours[hl.colour])
+                let hl = mapping.get(capture.group);
+                (hl, palette.colour(hl.base))
             }
-            None => (Highlight::default(), colours[5]),
+            None => (mapping.default, palette.colour(mapping.default.base)),
         };
 
         tokens.push(Token {

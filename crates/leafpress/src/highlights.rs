@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Highlight {
-    pub colour: usize,
+    pub base: usize,
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
@@ -8,424 +8,175 @@ pub struct Highlight {
     pub undercurl: bool,
 }
 
-pub struct Mapping {
+#[derive(Clone, Copy, Debug)]
+struct Mapping {
     name: &'static str,
-    hl: Highlight,
+    highlight: Highlight,
 }
 
-pub fn get_colour(name: &str, mapping: &[Mapping]) -> Highlight {
-    mapping
-        .binary_search_by(|m| m.name.cmp(name))
-        .map(|i| mapping[i].hl)
-        .unwrap_or_else(|_| hl(0x05))
+pub struct HighlightMap {
+    pub default: Highlight,
+    mappings: &'static [Mapping],
 }
 
-pub const DEFAULT_MAPPINGS: &[Mapping] = &[
-    Mapping {
-        name: "attribute",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "attribute.builtin",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "boolean",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "character",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "character.special",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "comment",
-        hl: hl(0x03),
-    },
-    Mapping {
-        name: "comment.documentation",
-        hl: hl(0x03),
-    },
-    Mapping {
-        name: "comment.error",
-        hl: hl(0x08),
-    },
-    Mapping {
-        name: "comment.note",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "comment.todo",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "comment.warning",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "constant",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "constant.builtin",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "constant.macro",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "constructor",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "diff.delta",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "diff.minus",
-        hl: hl(0x08),
-    },
-    Mapping {
-        name: "diff.plus",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "function",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "function.builtin",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "function.call",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "function.macro",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "function.method",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "function.method.call",
-        hl: hl(0x0d),
-    },
-    Mapping {
-        name: "keyword",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.conditional",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.conditional.ternary",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.coroutine",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.debug",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.directive",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.directive.define",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.exception",
-        hl: hl(0x08),
-    },
-    Mapping {
-        name: "keyword.function",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.import",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.modifier",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.operator",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.repeat",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.return",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "keyword.type",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "label",
-        hl: hl(0x0e),
-    },
-    Mapping {
-        name: "markup",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.1",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.2",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.3",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.4",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.5",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.heading.6",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.italic",
-        hl: Highlight {
-            colour: 0x0f,
-            italic: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "markup.link",
-        hl: Highlight {
-            colour: 0x0f,
-            underline: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "markup.link.label",
-        hl: Highlight {
-            colour: 0x0f,
-            underline: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "markup.link.url",
-        hl: Highlight {
-            colour: 0x0d,
-            underline: true,
-            ..hl(0x0d)
-        },
-    },
-    Mapping {
-        name: "markup.list",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.list.checked",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "markup.list.unchecked",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "markup.math",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "markup.quote",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.raw",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.raw.block",
-        hl: hl(0x0f),
-    },
-    Mapping {
-        name: "markup.strikethrough",
-        hl: Highlight {
-            colour: 0x0f,
-            strikethrough: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "markup.strong",
-        hl: Highlight {
-            colour: 0x0f,
-            bold: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "markup.underline",
-        hl: Highlight {
-            colour: 0x0f,
-            underline: true,
-            ..hl(0x0f)
-        },
-    },
-    Mapping {
-        name: "module",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "module.builtin",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "number",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "number.float",
-        hl: hl(0x09),
-    },
-    Mapping {
-        name: "operator",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "property",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "punctuation.bracket",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "punctuation.delimiter",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "punctuation.special",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "string.documentation",
-        hl: hl(0x0b),
-    },
-    Mapping {
-        name: "string.escape",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string.regexp",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string.special",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string.special.path",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string.special.symbol",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "string.special.url",
-        hl: Highlight {
-            colour: 0x0d,
-            underline: true,
-            ..hl(0x0d)
-        },
-    },
-    Mapping {
-        name: "tag",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "tag.attribute",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "tag.builtin",
-        hl: hl(0x0c),
-    },
-    Mapping {
-        name: "tag.delimiter",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "type",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "type.builtin",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "type.definition",
-        hl: hl(0x0a),
-    },
-    Mapping {
-        name: "variable",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "variable.builtin",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "variable.member",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "variable.parameter",
-        hl: hl(0x05),
-    },
-    Mapping {
-        name: "variable.parameter.builtin",
-        hl: hl(0x05),
-    },
-];
+impl Highlight {
+    pub const fn new(base: usize) -> Self {
+        Self {
+            base,
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            undercurl: false,
+        }
+    }
 
-const fn hl(colour: usize) -> Highlight {
-    Highlight {
-        colour,
-        bold: false,
-        italic: false,
-        underline: false,
-        strikethrough: false,
-        undercurl: false,
+    pub const fn bold(mut self) -> Self {
+        self.bold = true;
+        self
+    }
+
+    pub const fn italic(mut self) -> Self {
+        self.italic = true;
+        self
+    }
+
+    pub const fn underline(mut self) -> Self {
+        self.underline = true;
+        self
+    }
+
+    pub const fn strikethrough(mut self) -> Self {
+        self.strikethrough = true;
+        self
+    }
+
+    pub const fn undercurl(mut self) -> Self {
+        self.undercurl = true;
+        self
     }
 }
+
+impl HighlightMap {
+    pub fn get(&self, name: &str) -> Highlight {
+        self.mappings
+            .binary_search_by_key(&name, |mapping| mapping.name)
+            .map(|i| self.mappings[i].highlight)
+            .unwrap_or(self.default)
+    }
+}
+
+macro_rules! mappings {
+    ($($name:literal => $highlight:expr),* $(,)?) => {
+        &[
+            $(Mapping {
+                name: $name,
+                highlight: $highlight,
+            }),*
+        ]
+    };
+}
+
+macro_rules! h {
+    ($colour:expr) => {
+        Highlight::new($colour)
+    };
+}
+
+pub const DEFAULT_MAPPING: HighlightMap = HighlightMap {
+    default: h!(0x05),
+
+    mappings: mappings![
+        "attribute" => h!(0x0f),
+        "attribute.builtin" => h!(0x0f),
+        "boolean" => h!(0x09),
+        "character" => h!(0x0b),
+        "character.special" => h!(0x0c),
+        "comment" => h!(0x03),
+        "comment.documentation" => h!(0x03).italic(),
+        "comment.error" => h!(0x08),
+        "comment.note" => h!(0x0c),
+        "comment.todo" => h!(0x0f),
+        "comment.warning" => h!(0x09),
+        "constant" => h!(0x09),
+        "constant.builtin" => h!(0x09).bold(),
+        "constant.macro" => h!(0x09).bold(),
+        "constructor" => h!(0x0a),
+        "diff.delta" => h!(0x0a),
+        "diff.minus" => h!(0x08),
+        "diff.plus" => h!(0x0b),
+        "function" => h!(0x0d),
+        "function.builtin" => h!(0x0d),
+        "function.call" => h!(0x0d),
+        "function.macro" => h!(0x0d),
+        "function.method" => h!(0x0d),
+        "function.method.call" => h!(0x0d),
+        "keyword" => h!(0x0e),
+        "keyword.conditional" => h!(0x0e),
+        "keyword.conditional.ternary" => h!(0x0e),
+        "keyword.coroutine" => h!(0x0e),
+        "keyword.debug" => h!(0x0e),
+        "keyword.directive" => h!(0x0e),
+        "keyword.directive.define" => h!(0x0e),
+        "keyword.exception" => h!(0x08),
+        "keyword.function" => h!(0x0e),
+        "keyword.import" => h!(0x0e),
+        "keyword.modifier" => h!(0x0e),
+        "keyword.operator" => h!(0x0e),
+        "keyword.repeat" => h!(0x0e),
+        "keyword.return" => h!(0x0e),
+        "keyword.type" => h!(0x0e),
+        "label" => h!(0x0e),
+        "markup" => h!(0x0f),
+        "markup.heading" => h!(0x0f),
+        "markup.heading.1" => h!(0x0f),
+        "markup.heading.2" => h!(0x0f),
+        "markup.heading.3" => h!(0x0f),
+        "markup.heading.4" => h!(0x0f),
+        "markup.heading.5" => h!(0x0f),
+        "markup.heading.6" => h!(0x0f),
+        "markup.italic" => h!(0x0f).italic(),
+        "markup.link" => h!(0x0f).underline(),
+        "markup.link.label" => h!(0x0f).underline(),
+        "markup.link.url" => h!(0x0d).underline(),
+        "markup.list" => h!(0x0f),
+        "markup.list.checked" => h!(0x0b),
+        "markup.list.unchecked" => h!(0x0b),
+        "markup.math" => h!(0x0c),
+        "markup.quote" => h!(0x0f),
+        "markup.raw" => h!(0x0f),
+        "markup.raw.block" => h!(0x0f),
+        "markup.strikethrough" => h!(0x0f).strikethrough(),
+        "markup.strong" => h!(0x0f).bold(),
+        "markup.underline" => h!(0x0f).underline(),
+        "module" => h!(0x0a),
+        "module.builtin" => h!(0x0a),
+        "number" => h!(0x09),
+        "number.float" => h!(0x09),
+        "operator" => h!(0x05),
+        "property" => h!(0x05),
+        "punctuation.bracket" => h!(0x05),
+        "punctuation.delimiter" => h!(0x05),
+        "punctuation.special" => h!(0x0c),
+        "string" => h!(0x0b),
+        "string.documentation" => h!(0x0b),
+        "string.escape" => h!(0x0c),
+        "string.regexp" => h!(0x0c),
+        "string.special" => h!(0x0c),
+        "string.special.path" => h!(0x0c),
+        "string.special.symbol" => h!(0x0c),
+        "string.special.url" => h!(0x0d).underline(),
+        "tag" => h!(0x0a),
+        "tag.attribute" => h!(0x05),
+        "tag.builtin" => h!(0x0c),
+        "tag.delimiter" => h!(0x05),
+        "type" => h!(0x0a),
+        "type.builtin" => h!(0x0a),
+        "type.definition" => h!(0x0a),
+        "variable" => h!(0x05),
+        "variable.builtin" => h!(0x05),
+        "variable.member" => h!(0x05),
+        "variable.parameter" => h!(0x05),
+        "variable.parameter.builtin" => h!(0x05),
+    ],
+};

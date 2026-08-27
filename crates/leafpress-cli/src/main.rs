@@ -192,7 +192,7 @@ fn run(
 
     let theme_path = theme_dir.join(format!("{theme}.yaml"));
 
-    let palette = theme::load_base16(&theme_path)?;
+    let palette = theme::load_file(&theme_path)?;
     let source = fs::read(input)?;
     let loaded = parser::load_dynamic(&lang_path)?;
     let query = parser::load_query(&scheme_path, &loaded.language)?;
@@ -204,7 +204,7 @@ fn run(
         &loaded.language,
         &query,
         &palette,
-        Some(highlights::DEFAULT_MAPPINGS),
+        Some(&highlights::DEFAULT_MAPPING),
         Some(font_family),
         Some(font_size),
     )
