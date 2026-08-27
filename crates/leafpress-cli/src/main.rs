@@ -52,10 +52,6 @@ enum Command {
         /// Parser directory
         #[arg(short = 'p', long, env = "TSRENDER_GRAMMAR_DIR")]
         grammar_dir: Option<PathBuf>,
-
-        /// Parser directory
-        #[arg(long, env = "TSRENDER_THEME_DIR", default_value = "./themes")]
-        theme_dir: PathBuf,
     },
 }
 
@@ -133,7 +129,6 @@ fn run(
     font_size: u8,
     config_path: Option<PathBuf>,
     grammar_dir: Option<PathBuf>,
-    theme_dir: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     let config = load_config(config_path)?;
     let directories = parser_directories(&config)?;
@@ -182,17 +177,22 @@ fn run(
         .into());
     }
 
-    if !theme_dir.is_dir() {
-        return Err(format!(
-            "Failed to locate theme directory: {}",
-            theme_dir.to_str().unwrap()
-        )
-        .into());
-    }
+    // if !theme_dir.is_dir() {
+    //     return Err(format!(
+    //         "Failed to locate theme directory: {}",
+    //         theme_dir.to_str().unwrap()
+    //     )
+    //     .into());
+    // }
 
-    let theme_path = theme_dir.join(format!("{theme}.yaml"));
+    // let theme_path = theme_dir.join(format!("{theme}.yaml"));
 
-    let palette = theme::load_file(&theme_path)?;
+    let palette = match theme::get_theme(&theme) {
+        Some(v) => v,
+        None => {
+            return Err("bad theme".into());
+        }
+    };
     let source = fs::read(input)?;
     let loaded = parser::load_dynamic(&lang_path)?;
     let query = parser::load_query(&scheme_path, &loaded.language)?;
@@ -203,7 +203,7 @@ fn run(
         &source,
         &loaded.language,
         &query,
-        &palette,
+        palette,
         Some(&highlights::DEFAULT_MAPPING),
         Some(font_family),
         Some(font_size),
@@ -223,7 +223,6 @@ fn main() {
             lang,
             config_path,
             grammar_dir,
-            theme_dir,
         } => match run(
             &input,
             &output,
@@ -233,7 +232,6 @@ fn main() {
             size,
             config_path,
             grammar_dir,
-            theme_dir,
         ) {
             Ok(()) => std::process::exit(0),
             Err(err) => {

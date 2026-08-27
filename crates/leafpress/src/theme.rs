@@ -118,6 +118,17 @@ fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
     })
 }
 
+pub fn list_themes() -> impl Iterator<Item = &'static str> {
+    THEMES.iter().map(|(name, _)| *name)
+}
+
+pub fn get_theme(key: &str) -> Option<&'static StaticPalette> {
+    THEMES
+        .iter()
+        .find(|(name, _)| *name == key)
+        .map(|(_, palette)| *palette)
+}
+
 pub fn load_file(path: &Path) -> Result<CustomPalette, Box<dyn Error>> {
     if !path.exists() {
         return Err(format!("failed to load theme: '{path:?}' does not exist.").into());
@@ -152,3 +163,5 @@ pub fn load_file(path: &Path) -> Result<CustomPalette, Box<dyn Error>> {
         Some(theme.author),
     ))
 }
+
+include!(concat!(env!("OUT_DIR"), "/themes.rs"));
