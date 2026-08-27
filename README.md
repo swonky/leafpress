@@ -1,6 +1,13 @@
 # leafpress
 
-A small library and command-line utility for rendering source code as SVG images using dynamically-loaded Tree-sitter grammars and Base16 colour themes.
+A small library and command-line utility for rendering source code as SVG images using Tree-sitter grammars. 
+
+## Features
+* Portable SVG output (text rendered as paths).
+* Compile-time parser integration.
+* Dynamic parser loading at runtime.
+* Large collection of built-in colour schemes.
+* Supports custom colour schemes.
 
 ## Installation
 ### From crates
