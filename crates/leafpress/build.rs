@@ -6,32 +6,48 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Deserialize)]
-struct Base16Theme {
-    scheme: String,
-    author: String,
-    base00: String,
-    base01: String,
-    base02: String,
-    base03: String,
-    base04: String,
-    base05: String,
-    base06: String,
-    base07: String,
-    base08: String,
-    base09: String,
+#[derive(Debug, Deserialize)]
+pub struct Scheme {
+    pub system: String,
+    pub name: String,
+    pub author: String,
+    pub variant: String,
+    pub palette: SchemePalette,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SchemePalette {
+    pub base00: String,
+    pub base01: String,
+    pub base02: String,
+    pub base03: String,
+    pub base04: String,
+    pub base05: String,
+    pub base06: String,
+    pub base07: String,
+    pub base08: String,
+    pub base09: String,
     #[serde(rename = "base0A")]
-    base0a: String,
+    pub base0a: String,
     #[serde(rename = "base0B")]
-    base0b: String,
+    pub base0b: String,
     #[serde(rename = "base0C")]
-    base0c: String,
+    pub base0c: String,
     #[serde(rename = "base0D")]
-    base0d: String,
+    pub base0d: String,
     #[serde(rename = "base0E")]
-    base0e: String,
+    pub base0e: String,
     #[serde(rename = "base0F")]
-    base0f: String,
+    pub base0f: String,
+    // Base24 additions
+    // pub base10: String,
+    // pub base11: String,
+    // pub base12: String,
+    // pub base13: String,
+    // pub base14: String,
+    // pub base15: String,
+    // pub base16: String,
+    // pub base17: String,
 }
 
 #[derive(Debug)]
@@ -55,7 +71,7 @@ fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
     })
 }
 
-fn parse_theme(path: &Path) -> Result<Base16Theme, Box<dyn Error>> {
+fn parse_theme(path: &Path) -> Result<Scheme, Box<dyn Error>> {
     let file = fs::File::open(path)
         .map_err(|error| format!("failed to open theme '{}': {error}", path.display()))?;
 
@@ -119,7 +135,7 @@ fn make_identifier(path: &Path) -> String {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let themes_dir = Path::new("../../themes");
+    let themes_dir = Path::new("../../schemes/base16");
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let output = out_dir.join("themes.rs");
 
@@ -135,22 +151,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (path, theme) in &themes {
         let colours = [
-            &theme.base00,
-            &theme.base01,
-            &theme.base02,
-            &theme.base03,
-            &theme.base04,
-            &theme.base05,
-            &theme.base06,
-            &theme.base07,
-            &theme.base08,
-            &theme.base09,
-            &theme.base0a,
-            &theme.base0b,
-            &theme.base0c,
-            &theme.base0d,
-            &theme.base0e,
-            &theme.base0f,
+            &theme.palette.base00,
+            &theme.palette.base01,
+            &theme.palette.base02,
+            &theme.palette.base03,
+            &theme.palette.base04,
+            &theme.palette.base05,
+            &theme.palette.base06,
+            &theme.palette.base07,
+            &theme.palette.base08,
+            &theme.palette.base09,
+            &theme.palette.base0a,
+            &theme.palette.base0b,
+            &theme.palette.base0c,
+            &theme.palette.base0d,
+            &theme.palette.base0e,
+            &theme.palette.base0f,
         ];
 
         let colours: Vec<Rgb> = colours
@@ -175,7 +191,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         generated.push_str("    ],\n");
 
-        generated.push_str(&format!("    Some({:?}),\n", theme.scheme));
+        generated.push_str(&format!("    Some({:?}),\n", theme.name));
         generated.push_str(&format!("    Some({:?}),\n", theme.author));
         generated.push_str(");\n\n");
     }
@@ -185,7 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (path, theme) in &themes {
         let identifier = make_identifier(path);
 
-        generated.push_str(&format!("    ({:?}, &{}),\n", theme.scheme, identifier));
+        generated.push_str(&format!("    ({:?}, &{}),\n", theme.name, identifier));
     }
 
     generated.push_str("];\n");

@@ -21,6 +21,10 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    ListThemes {
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
     Render {
         /// Input file
         input: String,
@@ -214,6 +218,24 @@ fn main() {
     let args = Args::parse();
 
     match args.command {
+        Command::ListThemes { json } => {
+            let themes = theme::list_themes();
+            if json {
+                let values: Vec<_> = themes.collect();
+                let json_string = match serde_json::to_string(&values) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        eprintln!("ERROR: {err}");
+                        std::process::exit(1);
+                    }
+                };
+                println!("{}", json_string);
+            } else {
+                for name in themes {
+                    println!("{name}");
+                }
+            }
+        }
         Command::Render {
             input,
             output,

@@ -78,32 +78,49 @@ pub struct Rgb {
     pub b: u8,
 }
 
-#[derive(Deserialize)]
-struct Base16Theme {
-    scheme: String,
-    author: String,
-    base00: String,
-    base01: String,
-    base02: String,
-    base03: String,
-    base04: String,
-    base05: String,
-    base06: String,
-    base07: String,
-    base08: String,
-    base09: String,
+#[derive(Debug, Deserialize)]
+pub struct Scheme {
+    pub system: String,
+    pub name: String,
+    pub author: String,
+    pub variant: String,
+    pub palette: SchemePalette,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SchemePalette {
+    pub base00: String,
+    pub base01: String,
+    pub base02: String,
+    pub base03: String,
+    pub base04: String,
+    pub base05: String,
+    pub base06: String,
+    pub base07: String,
+    pub base08: String,
+    pub base09: String,
     #[serde(rename = "base0A")]
-    base0a: String,
+    pub base0a: String,
     #[serde(rename = "base0B")]
-    base0b: String,
+    pub base0b: String,
     #[serde(rename = "base0C")]
-    base0c: String,
+    pub base0c: String,
     #[serde(rename = "base0D")]
-    base0d: String,
+    pub base0d: String,
     #[serde(rename = "base0E")]
-    base0e: String,
+    pub base0e: String,
     #[serde(rename = "base0F")]
-    base0f: String,
+    pub base0f: String,
+
+    // Base24 additions
+    pub base10: String,
+    pub base11: String,
+    pub base12: String,
+    pub base13: String,
+    pub base14: String,
+    pub base15: String,
+    pub base16: String,
+    pub base17: String,
 }
 
 fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
@@ -138,7 +155,8 @@ pub fn load_file(path: &Path) -> Result<CustomPalette, Box<dyn Error>> {
     }
 
     let file = fs::File::open(path)?;
-    let theme: Base16Theme = serde_yaml::from_reader(file)?;
+    let scheme: Scheme = serde_yaml::from_reader(file)?;
+    let theme = scheme.palette;
 
     Ok(CustomPalette::new(
         [
@@ -159,8 +177,8 @@ pub fn load_file(path: &Path) -> Result<CustomPalette, Box<dyn Error>> {
             parse_hex(&theme.base0e)?,
             parse_hex(&theme.base0f)?,
         ],
-        Some(theme.scheme),
-        Some(theme.author),
+        Some(scheme.name),
+        Some(scheme.author),
     ))
 }
 
