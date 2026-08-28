@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeSitterConfig {
