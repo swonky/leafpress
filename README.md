@@ -4,6 +4,14 @@ A small library and command-line utility for rendering source code as Scalable V
 
 Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
 
+<table>
+  <tr>
+    <td><img src="docs/tree_sitter_rust.svg" width="100%" /></td>
+    <td><img src="docs/tree_sitter_go.svg" width="100%" /></td>
+    <td><img src="docs/tree_sitter_python.svg" width="100%" /></td>
+  </tr>
+</table>
+
 > [!WARNING]
 > Leafpress is currently **unstable and a work in progress**. APIs and behaviour may change without notice.
 
