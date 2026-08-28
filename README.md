@@ -36,7 +36,7 @@ Built in Rust using [Tree-sitter](https://tree-sitter.github.io) for parsing, an
 * [x] Large collection of built-in Base16 colour schemes sourced from [tinted-theming](https://github.com/tinted-theming).
 * [x] Custom user-defined themes.
 * [x] Custom user-defined highlight maps.
-* [ ] Text decorations (**bold**, _italic_, <u>underline</u>, <u>undercurl</u>, ~~strikethrough~~).
+* [x] Text decorations (**bold**, _italic_, <u>underline</u>, <u>undercurl</u>, ~~strikethrough~~).
 * [ ] Rendering font ligatures.
 * [ ] User-defined kerning and line spacing.
 * [ ] User-defined image height and width
