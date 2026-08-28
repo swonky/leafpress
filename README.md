@@ -1,4 +1,4 @@
-# leafpress
+# ☙ leafpress
 
 A small library and command-line utility for rendering highlighted source code as Scalable Vector Graphics (SVG).
 
