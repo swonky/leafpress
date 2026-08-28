@@ -1,75 +1,155 @@
 # leafpress
 
-A small library and command-line utility for rendering source code as SVG images using Tree-sitter grammars. 
+A small library and command-line utility for rendering source code as Scalable Vector Graphics (SVG) using Tree-sitter grammars.
+
+Built in Rust using Tree-sitter for parsing, and Pango and Cairo for text rendering.
+
+> [!WARNING]
+> Leafpress is currently **unstable and a work in progress**. APIs and behaviour may change without notice.
 
 ## Features
-* Portable SVG output (text rendered as paths).
+* Portable SVG output. Text is rendered as paths without font dependencies.
 * Compile-time parser integration.
 * Dynamic parser loading at runtime.
-* Large collection of built-in colour schemes.
-* Supports custom colour schemes.
+* Large collection of built-in Base16 colour schemes.
 
 ## Installation
 ### From crates
 TBD
 
 ### From source
+
+Clone this repository and run the following commands.
+
+#### Library
 ```sh
-cargo build --release leafpress-cli
+cargo build --release -p leafpress
+```
+
+#### Command-line utility
+```sh
+cargo build --release -p leafpress-cli
 cargo install --path crate/leafpress-cli
 ```
 
 ## Usage
+Leafpress supports both compile-time and runtime parser loading. Compile-time loading is more convenient when the required grammar is known at build time. Runtime loading allows grammars and highlight queries to be selected dynamically, making it better suited to generic Tree-sitter tooling.
+
+### Using a compile-time parser
+```rust
+use std::path::Path;
+use leafpress::{generate_svg, render::Format, theme};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let output_path = Path::new("./output.svg");
+    let source = br#"package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, world!")
+}
+"#;
+
+    let language = tree_sitter_go::LANGUAGE.into();
+    let query = tree_sitter::Query::new(&language, tree_sitter_go::HIGHLIGHTS_QUERY)?;
+
+    let palette = theme::GITHUB_DARK;
+    let format = Format::default();
+
+    generate_svg(
+        output_path,
+        source,
+        &language,
+        &query,
+        &palette,
+        &format,
+        None,
+    )?;
+
+    Ok(())
+}
+```
+
+### Using a runtime parser
+```rust
+use std::path::Path;
+use leafpress::{generate_svg, parser, render::Format, theme};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let output_path = Path::new("./output.svg");
+    let source = br#"package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, world!")
+}
+"#;
+
+    let loaded = parser::load_dynamic("./go.so")?;
+    let query = parser::load_query("./highlights.scm", &loaded.language)?;
+
+    let palette = theme::GITHUB_DARK;
+    let format = Format::default();
+
+    generate_svg(
+        output_path,
+        source,
+        &loaded.language,
+        &query,
+        &palette,
+        &format,
+        None,
+    )?;
+
+    Ok(())
+}
+```
 
 ### Command-line utility
 
+Render a source file to SVG:
+
 ```sh
-leafpress render -l rust main.rs
+leafpress render main.go --lang go
+````
+
+The output is written to `./output.svg` by default. Use `-o` to specify a different path:
+
+```sh
+leafpress render main.go --lang go -o main.svg
 ```
 
-```
-leafpress render --help
-Usage: leafpress render [OPTIONS] --lang <LANG> <INPUT>
+Formatting can be optionally customised with --theme, --font, --size, and --padding:
 
-Arguments:
-  <INPUT>  Input file
-
-Options:
-  -l, --lang <LANG>                Language name
-  -t, --theme <THEME>              Theme name [default: onedark/onedark]
-  -f, --font <FONT>                [default: monospace]
-  -s, --size <SIZE>                [default: 14]
-  -o, --output <OUTPUT>            Output file [default: ./output.svg]
-      --config-path <CONFIG_PATH>  Parser directory [env: TSRENDER_CONFIG_PATH=]
-  -p, --grammar-dir <GRAMMAR_DIR>  Parser directory [env: TSRENDER_GRAMMAR_DIR=]
-      --theme-dir <THEME_DIR>      Parser directory [env: TSRENDER_THEME_DIR=/home/tcs/src/tree-sitter/leafpress/themes] [default: ./themes]
-  -h, --help                       Print help
+```sh
+leafpress render main.go \
+    --lang go \
+    --theme "Github Dark"
+    --font "Iosevka Term" \
+    --size 14 \
+    --padding 20
 ```
 
-### Rust library
+List available themes:
 
-#### Dynamically loading a compiled parser
-```rust
-let lang_path = "./javascript.so";
-let query_path = "./highlights.scm";
-let theme_path = "./theme.yaml";
-
-let input_path = Path::new("./main.js"),
-let output_path = Path::new("./output.svg"),
-
-let source = fs::read(&input_path),
-let loaded = parser::load_dynamic(&lang_path)?;
-let query = parser::load_query(&scheme_path, &loaded.language)?;
-let theme = theme::load_base16(&theme_path);
-
-leafpress::generate_svg(
-    &output_path,
-    &source,
-    &loaded.language,
-    &query,
-    &palette,
-    Some(highlights::DEFAULT_MAPPINGS),
-    Some(font_family),
-    Some(font_size),
-)
+```sh
+leafpress list-themes
 ```
+
+List available Tree-sitter grammars:
+
+```sh
+leafpress list-grammars
+```
+
+Both listing commands support JSON output with `--json`.
+
+By default, grammars are located using the Tree-sitter configuration file. Use `--grammar-dir` to specify a parser directory directly:
+
+```sh
+leafpress render main.go --lang go --grammar-dir ~/src/tree-sitter-grammars
+```
+
+The grammar directory and Tree-sitter configuration path can also be set with `TSRENDER_GRAMMAR_DIR` and `TSRENDER_CONFIG_PATH`, respectively. 
