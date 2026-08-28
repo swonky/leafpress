@@ -1,8 +1,8 @@
 # leafpress
 
-A small library and command-line utility for rendering source code as Scalable Vector Graphics (SVG) using Tree-sitter grammars.
+A small library and command-line utility for rendering source code as Scalable Vector Graphics (SVG) using [Tree-sitter](https://tree-sitter.github.io) parsers.
 
-Built in Rust using Tree-sitter for parsing, and Pango and Cairo for text rendering.
+Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
 
 > [!WARNING]
 > Leafpress is currently **unstable and a work in progress**. APIs and behaviour may change without notice.
@@ -11,11 +11,11 @@ Built in Rust using Tree-sitter for parsing, and Pango and Cairo for text render
 * Portable SVG output. Text is rendered as paths without font dependencies.
 * Compile-time parser integration.
 * Dynamic parser loading at runtime.
-* Large collection of built-in Base16 colour schemes.
+* Large collection of built-in Base16 colour schemes sourced from [tinted-theming](https://github.com/tinted-theming).
 
 ## Installation
 ### From crates
-TBD
+**TBD**
 
 ### From source
 
@@ -27,6 +27,8 @@ cargo build --release -p leafpress
 ```
 
 #### Command-line utility
+Leafpress cannot compile tree-sitter grammars. It is recommended that you also install [tree-sitter-cli](https://github.com/tree-sitter/tree-sitter/tree/master/crates/cli) and its associated dependencies (incl. C compiler and JavaScript runtime).
+
 ```sh
 cargo build --release -p leafpress-cli
 cargo install --path crate/leafpress-cli
@@ -152,4 +154,4 @@ By default, grammars are located using the Tree-sitter configuration file. Use `
 leafpress render main.go --lang go --grammar-dir ~/src/tree-sitter-grammars
 ```
 
-The grammar directory and Tree-sitter configuration path can also be set with `TSRENDER_GRAMMAR_DIR` and `TSRENDER_CONFIG_PATH`, respectively. 
+The grammar directory and Tree-sitter configuration path can also be set with `TREESITTER_GRAMMAR_DIR` and `TREESITTER_CONFIG_PATH`, respectively. 

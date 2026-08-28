@@ -29,11 +29,11 @@ enum Command {
         #[arg(long, default_value_t = false)]
         json: bool,
         /// Parser directory
-        #[arg(long, env = "TSRENDER_CONFIG_PATH")]
+        #[arg(long, env = "TREESITTER_CONFIG_PATH")]
         config_path: Option<PathBuf>,
 
         /// Parser directory
-        #[arg(short = 'p', long, env = "TSRENDER_GRAMMAR_DIR")]
+        #[arg(short = 'p', long, env = "TREESITTER_GRAMMAR_DIR")]
         grammar_dir: Option<PathBuf>,
     },
     Render {
@@ -65,11 +65,11 @@ enum Command {
         output: String,
 
         /// Parser directory
-        #[arg(long, env = "TSRENDER_CONFIG_PATH")]
+        #[arg(long, env = "TREESITTER_CONFIG_PATH")]
         config_path: Option<PathBuf>,
 
         /// Parser directory
-        #[arg(short = 'p', long, env = "TSRENDER_GRAMMAR_DIR")]
+        #[arg(short = 'p', long, env = "TREESITTER_GRAMMAR_DIR")]
         grammar_dir: Option<PathBuf>,
     },
 }
