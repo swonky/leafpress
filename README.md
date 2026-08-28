@@ -37,7 +37,7 @@ Built in Rust using [Tree-sitter](https://tree-sitter.github.io) for parsing, an
 * [x] Custom user-defined themes.
 * [x] Custom user-defined highlight maps.
 * [x] Text decorations (**bold**, _italic_, <u>underline</u>, <u>undercurl</u>, ~~strikethrough~~).
-* [ ] Rendering font ligatures.
+* [x] Supports font ligatures.
 * [ ] User-defined kerning and line spacing.
 * [ ] User-defined image height and width
 * [ ] Language injection

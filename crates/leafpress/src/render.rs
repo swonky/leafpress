@@ -133,12 +133,21 @@ fn make_layout(
     layout.set_text(text);
 
     let attrs = AttrList::new();
+
+    // possibly unnecessary - should remove if ligatures work without it
+    let mut features: pango::Attribute = pango::AttrFontFeatures::new("'calt' 1").into();
+    features.set_start_index(0);
+    features.set_end_index(text.len() as u32);
+    attrs.insert(features);
+
     let mut output_position = 0usize;
 
     for token in tokens {
         let length = token.end - token.start;
         let start = output_position as u32;
         let end = (output_position + length) as u32;
+
+        // println!("{}", &text[start as usize..end as usize]);
 
         let rgb = token.colour;
         let mut attr: pango::Attribute = pango::AttrColor::new_foreground(
@@ -195,7 +204,6 @@ fn make_layout(
     let font_string = format!("{font_family} {font_size}");
     let font = FontDescription::from_string(&font_string);
     layout.set_font_description(Some(&font));
-
     let (ink, _) = layout.pixel_extents();
 
     Ok((layout, ink.width(), ink.height()))

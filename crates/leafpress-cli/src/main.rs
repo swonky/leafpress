@@ -45,7 +45,7 @@ enum Command {
         lang: String,
 
         /// Theme name
-        #[arg(short, long, default_value = "onedark/onedark")]
+        #[arg(short, long, default_value = "Github Dark")]
         theme: String,
 
         // Font family

@@ -25,7 +25,7 @@ func greet(u User) string {
     let language = tree_sitter_go::LANGUAGE.into();
     let query = tree_sitter::Query::new(&language, tree_sitter_go::HIGHLIGHTS_QUERY)?;
     let palette = theme::TOKYO_NIGHT_DARK;
-    let format = Format::default();
+    let format = Format::default().font_family("Ioskeley Mono Term");
 
     generate_svg(
         Path::new("../../target/tree_sitter_go.svg"),
@@ -63,7 +63,7 @@ fn greet(user: &User) -> String {
     let language = tree_sitter_rust::LANGUAGE.into();
     let query = tree_sitter::Query::new(&language, tree_sitter_rust::HIGHLIGHTS_QUERY)?;
     let palette = theme::OXOCARBON_DARK;
-    let format = Format::default();
+    let format = Format::default().font_family("Ioskeley Mono Term");
 
     generate_svg(
         Path::new("../../target/tree_sitter_rust.svg"),
@@ -101,7 +101,7 @@ def greet(user: User) -> str:
     let language = tree_sitter_python::LANGUAGE.into();
     let query = tree_sitter::Query::new(&language, tree_sitter_python::HIGHLIGHTS_QUERY)?;
     let palette = theme::DRACULA;
-    let format = Format::default();
+    let format = Format::default().font_family("Ioskeley Mono Term");
 
     generate_svg(
         Path::new("../../target/tree_sitter_python.svg"),
