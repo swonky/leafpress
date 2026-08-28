@@ -4,10 +4,10 @@ A small library and command-line utility for rendering highlighted source code a
 
 Built in Rust using [Tree-sitter](https://tree-sitter.github.io) for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
 
-<p>
-  <img src="docs/tree_sitter_rust.svg" width="33%">
-  <img src="docs/tree_sitter_go.svg" width="33%">
-  <img src="docs/tree_sitter_python.svg" width="33%">
+<p align="center">
+  <img src="docs/tree_sitter_rust.svg" width="32%">
+  <img src="docs/tree_sitter_go.svg" width="32%">
+  <img src="docs/tree_sitter_python.svg" width="32%">
 </p>
 
 > [!WARNING]

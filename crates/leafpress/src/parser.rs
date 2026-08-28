@@ -55,6 +55,24 @@ pub enum LoadError {
     InvalidInput(Box<dyn std::error::Error + Send + Sync>),
 }
 
+impl std::fmt::Display for LoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(err) => write!(f, "I/O error: {err}"),
+            Self::InvalidInput(err) => write!(f, "invalid input: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for LoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(err) => Some(err),
+            Self::InvalidInput(err) => Some(&**err),
+        }
+    }
+}
+
 /// Infers the Tree-sitter language symbol exported by a dynamic library.
 fn get_symbol(path: &Path) -> Result<Option<String>, LoadError> {
     let data = fs::read(path).map_err(LoadError::Io)?;

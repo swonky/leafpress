@@ -187,8 +187,8 @@ fn run(
     };
 
     let source = fs::read(input)?;
-    let loaded = parser::load_dynamic(&lang_path)?;
-    let query = parser::load_query(&scheme_path, &loaded.language)?;
+    let language = parser::load_dynamic(&lang_path)?;
+    let query = parser::load_query(&scheme_path, &language)?;
     let output_path = Path::new(&output);
     let format = render::Format::new()
         .font_size(font_size)
@@ -198,7 +198,7 @@ fn run(
     generate_svg(
         output_path,
         &source,
-        &loaded.language,
+        &language,
         &query,
         palette,
         &format,
