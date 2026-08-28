@@ -1,66 +1,199 @@
 // parser.rs
+use crate::fops;
 use crate::tree_sitter_config::TreeSitterConfig;
-use crate::tree_sitter_config::load_grammar_config;
 use libloading::{Library, Symbol};
 use object::{Object, ObjectSymbol};
-use std::ffi::OsStr;
-use std::os::unix::ffi::OsStrExt;
 use std::{
     error::Error,
-    fs,
+    fs, io,
     mem::ManuallyDrop,
     path::{Path, PathBuf},
 };
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
-pub struct LoadedLanguage {
+/// A Tree-sitter language loaded from a dynamic library.
+pub struct DynamicLanguage {
     _library: Library,
-    pub language: ManuallyDrop<Language>,
+    language: ManuallyDrop<Language>,
 }
 
+impl DynamicLanguage {
+    /// Returns the underlying Tree-sitter language.
+    pub fn language(&self) -> &Language {
+        &self.language
+    }
+}
+
+impl std::ops::Deref for DynamicLanguage {
+    type Target = Language;
+
+    /// Returns the underlying Tree-sitter language.
+    fn deref(&self) -> &Self::Target {
+        &self.language
+    }
+}
+
+/// A captured range from a Tree-sitter query.
 pub struct Capture<'a> {
+    /// Start byte offset of the captured range.
     pub start: usize,
+
+    /// End byte offset of the captured range.
     pub end: usize,
+
+    /// Name of the capture group.
     pub group: &'a str,
 }
 
-pub fn load_query(path: &Path, language: &Language) -> Result<Query, Box<dyn Error>> {
-    let source = String::from_utf8(fs::read(path)?)?;
-    let query = Query::new(language, &source)?;
-    Ok(query)
+/// An error encountered while loading a resource.
+#[derive(Debug)]
+pub enum LoadError {
+    /// An I/O error occurred while accessing the resource.
+    Io(io::Error),
+
+    /// The resource was accessible but contained invalid input.
+    InvalidInput(Box<dyn std::error::Error + Send + Sync>),
 }
 
-pub fn load_dynamic(path: &Path) -> Result<LoadedLanguage, Box<dyn Error>> {
-    let filename = path
-        .file_name()
-        .and_then(|x| x.to_str())
-        .ok_or("invalid language library path")?;
-    let stem = filename
-        .strip_suffix(".so")
-        .ok_or_else(|| format!("invalid language library: {filename}"))?;
-    if stem.is_empty() {
-        return Err("invalid language library name".into());
-    }
-    let symbol = match get_symbol(path)? {
-        Some(v) => v,
-        None => {
-            return Err(format!("failed to read symbol from {path:?}").into());
-        }
-    };
-    let library = unsafe { Library::new(path) }?;
+/// Infers the Tree-sitter language symbol exported by a dynamic library.
+fn get_symbol(path: &Path) -> Result<Option<String>, LoadError> {
+    let data = fs::read(path).map_err(LoadError::Io)?;
+
+    let file = object::File::parse(&*data).map_err(|err| LoadError::InvalidInput(Box::new(err)))?;
+
+    let symbol = file
+        .symbols()
+        .filter_map(|symbol| {
+            let name = symbol.name().ok()?;
+            name.strip_prefix("tree_sitter_")
+                .map(|suffix| (name, suffix.len()))
+        })
+        .min_by_key(|(_, len)| *len)
+        .map(|(name, _)| name.to_owned());
+
+    Ok(symbol)
+}
+
+/// Loads a Tree-sitter query from a scheme file.
+pub fn load_query(path: &Path, language: &Language) -> Result<Query, LoadError> {
+    fops::validate_file(path).map_err(LoadError::Io)?;
+
+    let source = fs::read_to_string(path).map_err(LoadError::Io)?;
+
+    Query::new(language, &source).map_err(|err| LoadError::InvalidInput(Box::new(err)))
+}
+
+/// Loads a Tree-sitter language from a dynamic library.
+pub fn load_dynamic(path: &Path) -> Result<DynamicLanguage, LoadError> {
+    fops::validate_file(path).map_err(LoadError::Io)?;
+
+    let symbol = get_symbol(path)?.ok_or_else(|| {
+        LoadError::InvalidInput(
+            format!("failed to find language symbol in {}", path.display()).into(),
+        )
+    })?;
+
+    let library =
+        unsafe { Library::new(path) }.map_err(|err| LoadError::InvalidInput(Box::new(err)))?;
+
     let language_fn: Symbol<unsafe extern "C" fn() -> *const tree_sitter::ffi::TSLanguage> =
-        unsafe { library.get(symbol.as_bytes())? };
+        unsafe { library.get(symbol.as_bytes()) }
+            .map_err(|err| LoadError::InvalidInput(Box::new(err)))?;
+
     let raw = unsafe { language_fn() };
+
     if raw.is_null() {
-        return Err(format!("{symbol} returned a null language").into());
+        return Err(LoadError::InvalidInput(
+            format!("{symbol} returned a null language").into(),
+        ));
     }
+
     let language = unsafe { ManuallyDrop::new(Language::from_raw(raw)) };
-    Ok(LoadedLanguage {
+
+    Ok(DynamicLanguage {
         _library: library,
         language,
     })
 }
 
+// Searches for all grammar repositories within `dirpath`.
+pub fn iter_grammars(
+    dirpath: &Path,
+) -> Result<impl Iterator<Item = Result<(PathBuf, TreeSitterConfig), LoadError>>, LoadError> {
+    fops::validate_directory(dirpath).map_err(LoadError::Io)?;
+
+    let subdirs = fs::read_dir(dirpath).map_err(LoadError::Io)?;
+
+    Ok(subdirs.filter_map(|entry| {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) => return Some(Err(LoadError::Io(err))),
+        };
+
+        if !entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with("tree-sitter-")
+        {
+            return None;
+        }
+
+        let grammar_path = entry.path();
+
+        if let Err(err) = fops::validate_directory(&grammar_path) {
+            return Some(Err(LoadError::Io(err)));
+        }
+
+        let config_path = grammar_path.join("tree-sitter.json");
+
+        Some(load_grammar_config(&config_path).map(|config| (grammar_path, config)))
+    }))
+}
+
+// Deserialises a tree-sitter.json config file.
+pub fn load_grammar_config(path: &Path) -> Result<TreeSitterConfig, LoadError> {
+    fops::validate_file(path).map_err(LoadError::Io)?;
+
+    let file = fs::File::open(path).map_err(LoadError::Io)?;
+
+    serde_json::from_reader(file).map_err(|err| LoadError::InvalidInput(Box::new(err)))
+}
+
+// Searches for a grammar within `dirpath` that matches `name`.
+pub fn find_in_dir(dirpath: &Path, name: &str) -> Result<Option<PathBuf>, LoadError> {
+    fops::validate_directory(dirpath).map_err(LoadError::Io)?;
+
+    for result in iter_grammars(dirpath)? {
+        let (grammar_path, config) = result?;
+
+        for grammar in config.grammars {
+            if grammar.name == name {
+                return Ok(match grammar.path {
+                    Some(path) => Some(grammar_path.join(path)),
+                    None => Some(grammar_path),
+                });
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+// Searches for a grammar within a sequence of paths within `dirpath` that matches `name`.
+pub fn find_in_dirs(dirpaths: Vec<PathBuf>, name: &str) -> Result<Option<PathBuf>, LoadError> {
+    for path in dirpaths {
+        if let Some(grammar_path) = find_in_dir(&path, name)? {
+            return Ok(Some(grammar_path));
+        }
+    }
+
+    Err(LoadError::InvalidInput(Box::new(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("grammar '{name}' not found"),
+    ))))
+}
+
+// Executes a highlighting query on the source text and returns all capture groups.
 pub fn collect_captures<'a>(
     source: &[u8],
     language: &Language,
@@ -87,101 +220,4 @@ pub fn collect_captures<'a>(
         }
     }
     Ok(captures)
-}
-
-fn get_symbol(path: &Path) -> Result<Option<String>, Box<dyn Error>> {
-    let data = fs::read(path)?;
-    let file = object::File::parse(&*data)?;
-
-    let symbol = file
-        .symbols()
-        .filter_map(|symbol| {
-            let name = symbol.name().ok()?;
-            name.strip_prefix("tree_sitter_")
-                .map(|suffix| (name, suffix.len()))
-        })
-        .min_by_key(|(_, len)| *len)
-        .map(|(name, _)| name.to_owned());
-
-    Ok(symbol)
-}
-
-fn starts_with(s: &OsStr, prefix: &OsStr) -> bool {
-    s.as_bytes().starts_with(prefix.as_bytes())
-}
-
-pub fn iter_grammars(
-    dirpath: &Path,
-) -> Result<impl Iterator<Item = Result<(PathBuf, TreeSitterConfig), Box<dyn Error>>>, Box<dyn Error>>
-{
-    if !dirpath.exists() {
-        return Err(
-            format!("failed to load grammar directory: '{dirpath:?}' does not exist.").into(),
-        );
-    }
-
-    if !dirpath.is_dir() {
-        return Err(
-            format!("failed to load grammar directory: '{dirpath:?}' is not a directory.").into(),
-        );
-    }
-
-    let subdirs = fs::read_dir(dirpath)?;
-
-    Ok(subdirs.filter_map(|entry| {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(e) => return Some(Err(e.into())),
-        };
-
-        if !starts_with(&entry.file_name(), OsStr::new("tree-sitter-")) {
-            return None;
-        }
-
-        let grammar_path = entry.path();
-        let config_path = grammar_path.join("tree-sitter.json");
-
-        match load_grammar_config(&config_path) {
-            Ok(config) => Some(Ok((grammar_path, config))),
-            Err(e) => Some(Err(e)),
-        }
-    }))
-}
-
-pub fn find_in_dir(dirpath: &Path, name: &str) -> Result<Option<PathBuf>, Box<dyn Error>> {
-    if !dirpath.exists() {
-        return Err(
-            format!("failed to load grammar directory: '{dirpath:?}' does not exist.").into(),
-        );
-    }
-    if !dirpath.is_dir() {
-        return Err(
-            format!("failed to load grammar directory: '{dirpath:?}' is not a directory.").into(),
-        );
-    }
-
-    for result in iter_grammars(dirpath)? {
-        let (grammar_path, config) = result?;
-
-        for grammar in config.grammars {
-            if grammar.name == name {
-                return match grammar.path {
-                    Some(v) => Ok(Some(grammar_path.join(v))),
-                    None => Ok(Some(grammar_path)),
-                };
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-pub fn find_in_dirs(dirpaths: Vec<PathBuf>, name: &str) -> Result<Option<PathBuf>, Box<dyn Error>> {
-    for path in dirpaths {
-        if let Some(grammar_path) = find_in_dir(&path, name)? {
-            return Ok(Some(grammar_path));
-        }
-    }
-
-    Err(format!("grammar '{name}' not found").into())
 }

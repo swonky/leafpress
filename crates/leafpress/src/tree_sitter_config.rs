@@ -1,5 +1,5 @@
-use std::{fs, error::Error, path::Path};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{error::Error, fs, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeSitterConfig {
@@ -140,16 +140,3 @@ pub struct Links {
     /// The project's repository.
     pub repository: String,
 }
-
-pub fn load_grammar_config(path: &Path) -> Result<TreeSitterConfig, Box<dyn Error>> {
-    if !path.exists() {
-        return Err(format!("failed to load config file: '{path:?}' does not exist.").into());
-    }
-    if !path.is_file() {
-        return Err(format!("failed to load config file: '{path:?}' is not a file.").into());
-    }
-
-    let file = fs::File::open(path)?;
-    Ok(serde_json::from_reader(file)?)
-}
-

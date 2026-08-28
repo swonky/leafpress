@@ -17,6 +17,8 @@ pub mod theme;
 /// Parsing and handling of Tree-sitter configuration files.
 pub mod tree_sitter_config;
 
+mod fops;
+
 use std::{error::Error, path::Path};
 
 /// Generates an SVG image from source code.
