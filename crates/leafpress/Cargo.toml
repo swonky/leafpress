@@ -22,6 +22,9 @@ typify = "0.7"
 prettyplease = "0.2"
 syn = "2"
 
+[dev-dependencies]
+tree-sitter-go = "0.25"
+
 [profile.release]
 lto = true
 codegen-units = 1

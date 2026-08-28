@@ -14,7 +14,7 @@ use crate::highlights::{Highlight, HighlightMap};
 use crate::parser::Capture;
 use crate::theme::{Palette, Rgb};
 
-use std::{error::Error, path::Path};
+use std::{error::Error, fs, path::Path};
 
 #[derive(Debug, Clone)]
 pub struct Format {
@@ -326,6 +326,58 @@ pub fn render(
     Ok(buffer.borrow().clone())
 }
 
+fn validate_output_path(path: &Path) -> Result<(), io::Error> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+
+    if !parent.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("parent directory does not exist: {}", parent.display()),
+        ));
+    }
+
+    if !parent.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotADirectory,
+            format!("parent path is not a directory: {}", parent.display()),
+        ));
+    }
+
+    if path.exists() {
+        if path.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::IsADirectory,
+                format!("output path is a directory: {}", path.display()),
+            ));
+        }
+
+        // Check that the existing file can actually be opened for writing.
+        fs::OpenOptions::new().write(true).open(path).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("cannot write to {}: {}", path.display(), e),
+            )
+        })?;
+    } else {
+        // Check that the parent directory is writable without creating anything.
+        let metadata = fs::metadata(parent).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("cannot access parent directory {}: {}", parent.display(), e),
+            )
+        })?;
+
+        if metadata.permissions().readonly() {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("parent directory is read-only: {}", parent.display()),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn render_to_file(
     source: &[u8],
     tokens: &[Token],
@@ -333,6 +385,8 @@ pub fn render_to_file(
     background: &Rgb,
     output: &Path,
 ) -> Result<(), Box<dyn Error>> {
+    validate_output_path(output)?;
+
     let (layout, ink_width, ink_height) = make_layout(
         source,
         tokens,
