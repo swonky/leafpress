@@ -10,6 +10,7 @@ pub trait Palette {
     fn name(&self) -> Option<&str>;
     fn author(&self) -> Option<&str>;
     fn background(&self) -> &Rgb;
+    fn iter(&self) -> Box<dyn Iterator<Item = Rgb> + '_>;
 }
 
 #[derive(Clone, Copy)]
@@ -59,6 +60,10 @@ impl Palette for StaticPalette {
     fn background(&self) -> &Rgb {
         &self.rgb[0]
     }
+
+    fn iter(&self) -> Box<dyn Iterator<Item = Rgb> + '_> {
+        Box::new(self.rgb.iter().copied())
+    }
 }
 
 impl Palette for CustomPalette {
@@ -77,6 +82,10 @@ impl Palette for CustomPalette {
 
     fn background(&self) -> &Rgb {
         &self.rgb[0]
+    }
+
+    fn iter(&self) -> Box<dyn Iterator<Item = Rgb> + '_> {
+        Box::new(self.rgb.iter().copied())
     }
 }
 
@@ -144,8 +153,10 @@ fn parse_hex(s: &str) -> Result<Rgb, Box<dyn Error>> {
     })
 }
 
-pub fn list_themes() -> impl Iterator<Item = &'static str> {
-    THEMES.iter().map(|(name, _)| *name)
+pub fn iter_themes() -> impl Iterator<Item = (&'static str, &'static dyn Palette)> {
+    THEMES
+        .iter()
+        .map(|(name, palette)| (*name, *palette as &'static dyn Palette))
 }
 
 pub fn get_theme(key: &str) -> Option<&'static StaticPalette> {

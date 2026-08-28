@@ -263,9 +263,9 @@ fn main() {
             }
         },
         Command::ListThemes { json } => {
-            let themes = theme::list_themes();
+            let themes = theme::iter_themes();
             if json {
-                let values: Vec<_> = themes.collect();
+                let values: Vec<_> = themes.map(|(name, _)| name).collect();
                 let json_string = match serde_json::to_string(&values) {
                     Ok(v) => v,
                     Err(err) => {
@@ -275,8 +275,12 @@ fn main() {
                 };
                 println!("{}", json_string);
             } else {
-                for name in themes {
-                    println!("{name}");
+                for (name, palette) in themes {
+                    for rgb in palette.iter() {
+                        print!("\x1b[48;2;{};{};{}m  \x1b[0m", rgb.r, rgb.g, rgb.b);
+                    }
+                    print!(" {name}");
+                    println!();
                 }
             }
         }
