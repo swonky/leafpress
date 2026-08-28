@@ -1,8 +1,8 @@
 # leafpress
 
-A small library and command-line utility for rendering source code as Scalable Vector Graphics (SVG) using [Tree-sitter](https://tree-sitter.github.io) parsers.
+A small library and command-line utility for rendering highlighted source code as Scalable Vector Graphics (SVG).
 
-Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
+Built in Rust using [Tree-sitter](https://tree-sitter.github.io) for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
 
 <p>
   <img src="docs/tree_sitter_rust.svg" width="33%">
@@ -17,7 +17,6 @@ Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/doc
 <!-- mtoc-start -->
 
 * [Features](#features)
-* [To do](#to-do)
 * [Installation](#installation)
   * [From crates](#from-crates)
   * [From source](#from-source)
@@ -31,18 +30,19 @@ Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/doc
 <!-- mtoc-end -->
 
 ## Features
-* Portable SVG output. Text is rendered as paths without font dependencies.
-* Compile-time parser integration.
-* Dynamic parser loading at runtime.
-* Large collection of built-in Base16 colour schemes sourced from [tinted-theming](https://github.com/tinted-theming).
-
-## To do
-[ ] Ligatures
-[ ] Kerning and line spacing
-[ ] User-defined height and width
-[ ] Language injection
-[ ] More and better tests
-[ ] A better to do list
+* [x] Portable SVG output. Unicode text is rendered as paths without font dependencies.
+* [x] Compile-time parser integration.
+* [x] Runtime parser integration (dynamic shared library and scheme files).
+* [x] Large collection of built-in Base16 colour schemes sourced from [tinted-theming](https://github.com/tinted-theming).
+* [x] Custom user-defined themes.
+* [x] Custom user-defined highlight maps.
+* [ ] Text decorations (**bold**, _italic_, <u>underline</u>, <u>undercurl</u>, ~~strikethrough~~).
+* [ ] Rendering font ligatures.
+* [ ] User-defined kerning and line spacing.
+* [ ] User-defined image height and width
+* [ ] Language injection
+* [ ] More and better tests
+* [ ] A better to do list
 
 ## Installation
 ### From crates
