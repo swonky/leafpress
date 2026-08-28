@@ -4,13 +4,11 @@ A small library and command-line utility for rendering source code as Scalable V
 
 Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/docs/architecture/pango) and [Cairo](https://www.cairographics.org/) for text rendering.
 
-<table>
-  <tr>
-    <td><img src="docs/tree_sitter_rust.svg" width="100%" /></td>
-    <td><img src="docs/tree_sitter_go.svg" width="100%" /></td>
-    <td><img src="docs/tree_sitter_python.svg" width="100%" /></td>
-  </tr>
-</table>
+<p>
+  <img src="docs/tree_sitter_rust.svg" width="33%">
+  <img src="docs/tree_sitter_go.svg" width="33%">
+  <img src="docs/tree_sitter_python.svg" width="33%">
+</p>
 
 > [!WARNING]
 > Leafpress is currently **unstable and a work in progress**. APIs and behaviour may change without notice.
@@ -19,6 +17,7 @@ Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/doc
 <!-- mtoc-start -->
 
 * [Features](#features)
+* [To do](#to-do)
 * [Installation](#installation)
   * [From crates](#from-crates)
   * [From source](#from-source)
@@ -36,6 +35,14 @@ Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/doc
 * Compile-time parser integration.
 * Dynamic parser loading at runtime.
 * Large collection of built-in Base16 colour schemes sourced from [tinted-theming](https://github.com/tinted-theming).
+
+## To do
+[ ] Ligatures
+[ ] Kerning and line spacing
+[ ] User-defined height and width
+[ ] Language injection
+[ ] More and better tests
+[ ] A better to do list
 
 ## Installation
 ### From crates
