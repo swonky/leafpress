@@ -25,6 +25,17 @@ enum Command {
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+    ListGrammars {
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Parser directory
+        #[arg(long, env = "TSRENDER_CONFIG_PATH")]
+        config_path: Option<PathBuf>,
+
+        /// Parser directory
+        #[arg(short = 'p', long, env = "TSRENDER_GRAMMAR_DIR")]
+        grammar_dir: Option<PathBuf>,
+    },
     Render {
         /// Input file
         input: String,
@@ -99,30 +110,30 @@ fn parser_directories(config: &Value) -> Result<Vec<PathBuf>, Box<dyn Error>> {
         .collect()
 }
 
-fn find_grammar(
-    grammar_path: Option<PathBuf>,
-    parser_directories: &[PathBuf],
-    lang: &str,
-) -> Result<PathBuf, Box<dyn Error>> {
-    if let Some(path) = grammar_path {
-        if !path.is_dir() {
-            return Err(format!("grammar directory does not exist: {path:?}").into());
-        }
-
-        return Ok(path);
-    }
-
-    let name = format!("tree-sitter-{lang}");
-
-    parser_directories
-        .iter()
-        .map(|directory| directory.join(&name))
-        .find(|path| path.is_dir())
-        .ok_or_else(|| {
-            format!("could not find grammar directory '{name}' in any configured parser directory")
-                .into()
-        })
-}
+// fn find_grammar(
+//     grammar_path: Option<PathBuf>,
+//     parser_directories: &[PathBuf],
+//     lang: &str,
+// ) -> Result<PathBuf, Box<dyn Error>> {
+//     if let Some(path) = grammar_path {
+//         if !path.is_dir() {
+//             return Err(format!("grammar directory does not exist: {path:?}").into());
+//         }
+//
+//         return Ok(path);
+//     }
+//
+//     let name = format!("tree-sitter-{lang}");
+//
+//     parser_directories
+//         .iter()
+//         .map(|directory| directory.join(&name))
+//         .find(|path| path.is_dir())
+//         .ok_or_else(|| {
+//             format!("could not find grammar directory '{name}' in any configured parser directory")
+//                 .into()
+//         })
+// }
 
 fn run(
     input: &str,
@@ -134,9 +145,16 @@ fn run(
     config_path: Option<PathBuf>,
     grammar_dir: Option<PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
-    let config = load_config(config_path)?;
-    let directories = parser_directories(&config)?;
-    let grammar = find_grammar(grammar_dir, &directories, lang)?;
+    let grammar_path = match grammar_dir {
+        Some(path) => parser::find_in_dir(&path, lang)?,
+        None => {
+            let config = load_config(config_path)?;
+            let directories = parser_directories(&config)?;
+            parser::find_in_dirs(directories, lang)?
+        }
+    };
+
+    let grammar = grammar_path.ok_or_else(|| format!("grammar '{lang}' not found"))?;
 
     let scheme_path = grammar.join("queries").join(format!("highlights.scm"));
 
@@ -181,16 +199,6 @@ fn run(
         .into());
     }
 
-    // if !theme_dir.is_dir() {
-    //     return Err(format!(
-    //         "Failed to locate theme directory: {}",
-    //         theme_dir.to_str().unwrap()
-    //     )
-    //     .into());
-    // }
-
-    // let theme_path = theme_dir.join(format!("{theme}.yaml"));
-
     let palette = match theme::get_theme(&theme) {
         Some(v) => v,
         None => {
@@ -214,10 +222,62 @@ fn run(
     )
 }
 
+fn list_grammars(
+    json: bool,
+    config_path: Option<PathBuf>,
+    grammar_dir: Option<PathBuf>,
+) -> Result<(), Box<dyn Error>> {
+    match grammar_dir {
+        Some(path) => {
+            for result in parser::iter_grammars(&path)? {
+                let (_grammar_path, grammar_config) = result?;
+
+                for grammar in grammar_config.grammars {
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&grammar)?);
+                    } else {
+                        println!("{}", grammar.name);
+                    }
+                }
+            }
+        }
+        None => {
+            let config = load_config(config_path)?;
+            let directories = parser_directories(&config)?;
+
+            for directory in directories {
+                for result in parser::iter_grammars(&directory)? {
+                    let (_grammar_path, grammar_config) = result?;
+
+                    for grammar in grammar_config.grammars {
+                        if json {
+                            println!("{}", serde_json::to_string_pretty(&grammar)?);
+                        } else {
+                            println!("{}", grammar.name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     let args = Args::parse();
 
     match args.command {
+        Command::ListGrammars {
+            json,
+            config_path,
+            grammar_dir,
+        } => match list_grammars(json, config_path, grammar_dir) {
+            Ok(()) => std::process::exit(0),
+            Err(err) => {
+                eprintln!("ERROR: {err}");
+                std::process::exit(1);
+            }
+        },
         Command::ListThemes { json } => {
             let themes = theme::list_themes();
             if json {

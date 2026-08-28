@@ -3,6 +3,7 @@ pub mod highlights;
 pub mod parser;
 pub mod render;
 pub mod theme;
+pub mod tree_sitter_config;
 
 use std::{error::Error, path::Path};
 
