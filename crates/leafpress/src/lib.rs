@@ -41,26 +41,15 @@ pub fn generate_svg<P: theme::Palette>(
     language: &tree_sitter::Language,
     query: &tree_sitter::Query,
     palette: &P,
+    format: &render::Format,
     mapping: Option<&highlights::HighlightMap>,
-    font_family: Option<&str>,
-    font_size: Option<u8>,
 ) -> Result<(), Box<dyn Error>> {
     let mapping = mapping.unwrap_or(&highlights::DEFAULT_MAPPING);
-    let font_family = font_family.unwrap_or("monospace");
-    let font_size = font_size.unwrap_or(14);
 
     let captures = parser::collect_captures(&source, language, &query)?;
-    let background = palette.colour(0);
     let tokens = render::make_tokens(source, &captures, palette, mapping);
 
     let output_path = Path::new(&output);
 
-    render::render(
-        source,
-        &tokens,
-        &output_path,
-        background,
-        font_family,
-        font_size,
-    )
+    render::render_to_file(source, &tokens, &format, palette.background(), &output_path)
 }

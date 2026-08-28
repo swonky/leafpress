@@ -7,12 +7,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{Parser as ClapParser, Subcommand};
+use clap::{Parser, Subcommand};
 use serde_json::Value;
 
-use leafpress::{generate_svg, highlights, parser, theme};
+use leafpress::{generate_svg, highlights, parser, render, theme};
 
-#[derive(ClapParser)]
+#[derive(Parser)]
 #[command(version, about)]
 struct Args {
     #[command(subcommand)]
@@ -55,6 +55,10 @@ enum Command {
         // Font family
         #[arg(short, long, default_value_t = 14)]
         size: u8,
+
+        // Padding
+        #[arg(short, long, default_value_t = 20.0)]
+        padding: f64,
 
         /// Output file
         #[arg(short, long, default_value = "./output.svg")]
@@ -110,31 +114,6 @@ fn parser_directories(config: &Value) -> Result<Vec<PathBuf>, Box<dyn Error>> {
         .collect()
 }
 
-// fn find_grammar(
-//     grammar_path: Option<PathBuf>,
-//     parser_directories: &[PathBuf],
-//     lang: &str,
-// ) -> Result<PathBuf, Box<dyn Error>> {
-//     if let Some(path) = grammar_path {
-//         if !path.is_dir() {
-//             return Err(format!("grammar directory does not exist: {path:?}").into());
-//         }
-//
-//         return Ok(path);
-//     }
-//
-//     let name = format!("tree-sitter-{lang}");
-//
-//     parser_directories
-//         .iter()
-//         .map(|directory| directory.join(&name))
-//         .find(|path| path.is_dir())
-//         .ok_or_else(|| {
-//             format!("could not find grammar directory '{name}' in any configured parser directory")
-//                 .into()
-//         })
-// }
-
 fn run(
     input: &str,
     output: &str,
@@ -142,6 +121,7 @@ fn run(
     theme: &str,
     font_family: &str,
     font_size: u8,
+    padding: f64,
     config_path: Option<PathBuf>,
     grammar_dir: Option<PathBuf>,
 ) -> Result<(), Box<dyn Error>> {
@@ -205,10 +185,15 @@ fn run(
             return Err("bad theme".into());
         }
     };
+
     let source = fs::read(input)?;
     let loaded = parser::load_dynamic(&lang_path)?;
     let query = parser::load_query(&scheme_path, &loaded.language)?;
     let output_path = Path::new(&output);
+    let format = render::Format::new()
+        .font_size(font_size)
+        .font_family(font_family)
+        .padding(padding);
 
     generate_svg(
         output_path,
@@ -216,9 +201,8 @@ fn run(
         &loaded.language,
         &query,
         palette,
+        &format,
         Some(&highlights::DEFAULT_MAPPING),
-        Some(font_family),
-        Some(font_size),
     )
 }
 
@@ -299,10 +283,11 @@ fn main() {
         Command::Render {
             input,
             output,
+            lang,
             theme,
             font,
             size,
-            lang,
+            padding,
             config_path,
             grammar_dir,
         } => match run(
@@ -312,6 +297,7 @@ fn main() {
             &theme,
             &font,
             size,
+            padding,
             config_path,
             grammar_dir,
         ) {

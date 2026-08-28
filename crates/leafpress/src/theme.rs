@@ -9,6 +9,7 @@ pub trait Palette {
     fn colour(&self, index: usize) -> &Rgb;
     fn name(&self) -> Option<&str>;
     fn author(&self) -> Option<&str>;
+    fn background(&self) -> &Rgb;
 }
 
 #[derive(Clone, Copy)]
@@ -54,6 +55,10 @@ impl Palette for StaticPalette {
     fn author(&self) -> Option<&str> {
         self.author
     }
+
+    fn background(&self) -> &Rgb {
+        &self.rgb[0]
+    }
 }
 
 impl Palette for CustomPalette {
@@ -68,6 +73,10 @@ impl Palette for CustomPalette {
 
     fn author(&self) -> Option<&str> {
         self.author.as_deref()
+    }
+
+    fn background(&self) -> &Rgb {
+        &self.rgb[0]
     }
 }
 
