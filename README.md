@@ -7,6 +7,22 @@ Built in Rust using Tree-sitter for parsing, and [Pango](https://www.gtk.org/doc
 > [!WARNING]
 > Leafpress is currently **unstable and a work in progress**. APIs and behaviour may change without notice.
 
+
+<!-- mtoc-start -->
+
+* [Features](#features)
+* [Installation](#installation)
+  * [From crates](#from-crates)
+  * [From source](#from-source)
+    * [Library](#library)
+    * [Command-line utility](#command-line-utility)
+* [Usage](#usage)
+  * [Using a compile-time parser](#using-a-compile-time-parser)
+  * [Using a runtime parser](#using-a-runtime-parser)
+  * [Command-line utility](#command-line-utility-1)
+
+<!-- mtoc-end -->
+
 ## Features
 * Portable SVG output. Text is rendered as paths without font dependencies.
 * Compile-time parser integration.
